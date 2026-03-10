@@ -45,6 +45,11 @@
                                             <input type="password" class="form-control form-control-lg is-hidden" id="password" name="password" placeholder="{{ __('main.enter_password') }}" required>
                                         </div>
                                     </div>
+                                    @if(config('captcha.method') === 'cloudflare' && config('turnstile.site_key'))
+                                    <div class="form-group">
+                                        <div id="login-turnstile"></div>
+                                    </div>
+                                    @endif
                                     <div class="form-group">
                                         <button type="submit" class="btn btn-lg btn-primary btn-block login-btn">{{ __('main.sign_in') }}</button>
                                     </div>
@@ -69,69 +74,41 @@
 @endsection
 
 @push('scripts')
-@if(config('recaptcha.site_key'))
+@if(config('captcha.method') === 'google' && config('recaptcha.site_key'))
 <script src="https://www.google.com/recaptcha/api.js?render={{ config('recaptcha.site_key') }}"></script>
+@endif
+@if(config('captcha.method') === 'cloudflare' && config('turnstile.site_key'))
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 @endif
 <script>
 $(document).ready(function() {
-    $('.login-btn').click(function (e) {
-        e.preventDefault();
-        $('input').removeClass('error');
-        
-        @if(config('recaptcha.site_key'))
-        // Get reCAPTCHA token
-        grecaptcha.ready(function() {
-            grecaptcha.execute('{{ config('recaptcha.site_key') }}', {action: 'login'}).then(function(token) {
-                let username = $('input[name="username"]').val();
-                let password = $('input[name="password"]').val();
-                $.ajax({
-                    url: '{{ route("login") }}',
-                    type: 'POST',
-                    dataType: 'json',
-                    data: {
-                        username: username,
-                        password: password,
-                        recaptcha_token: token,
-                        _token: '{{ csrf_token() }}'
-                    },
-                    success: function(data) {
-                        if (data.status) {
-                            document.location.href = data.redirect || '{{ route("cabinet") }}';
-                        } else {
-                            $('.msg').removeClass('none').text(data.message || '{{ __("main.login_error") }}');
-                        }
-                    },
-                    error: function(xhr) {
-                        if (xhr.status === 422) {
-                            let errors = xhr.responseJSON.errors;
-                            if (errors.username) {
-                                $('input[name="username"]').addClass('error');
-                            }
-                            if (errors.password) {
-                                $('input[name="password"]').addClass('error');
-                            }
-                            $('.msg').removeClass('none').text(errors.username ? errors.username[0] : '{{ __("main.validation_error") }}');
-                        } else {
-                            $('.msg').removeClass('none').text('{{ __("main.server_error") }}');
-                        }
-                    }
-                });
-            });
+    var loginTurnstileWidgetId = null;
+    @if(config('captcha.method') === 'cloudflare' && config('turnstile.site_key'))
+    if (typeof turnstile !== 'undefined') {
+        loginTurnstileWidgetId = turnstile.render('#login-turnstile', { sitekey: '{{ config('turnstile.site_key') }}' });
+    } else {
+        window.addEventListener('load', function() {
+            if (document.getElementById('login-turnstile') && typeof turnstile !== 'undefined') {
+                loginTurnstileWidgetId = turnstile.render('#login-turnstile', { sitekey: '{{ config('turnstile.site_key') }}' });
+            }
         });
-        @else
-        // reCAPTCHA not configured, submit form without token
-        let username = $('input[name="username"]').val();
-        let password = $('input[name="password"]').val();
+    }
+    @endif
+
+    function doLogin(captchaToken) {
+        var username = $('input[name="username"]').val();
+        var password = $('input[name="password"]').val();
+        var data = {
+            username: username,
+            password: password,
+            recaptcha_token: captchaToken || '',
+            _token: '{{ csrf_token() }}'
+        };
         $.ajax({
             url: '{{ route("login") }}',
             type: 'POST',
             dataType: 'json',
-            data: {
-                username: username,
-                password: password,
-                recaptcha_token: '',
-                _token: '{{ csrf_token() }}'
-            },
+            data: data,
             success: function(data) {
                 if (data.status) {
                     document.location.href = data.redirect || '{{ route("cabinet") }}';
@@ -141,19 +118,40 @@ $(document).ready(function() {
             },
             error: function(xhr) {
                 if (xhr.status === 422) {
-                    let errors = xhr.responseJSON.errors;
-                    if (errors.username) {
+                    var errors = xhr.responseJSON.errors;
+                    if (errors && errors.username) {
                         $('input[name="username"]').addClass('error');
                     }
-                    if (errors.password) {
+                    if (errors && errors.password) {
                         $('input[name="password"]').addClass('error');
                     }
-                    $('.msg').removeClass('none').text(errors.username ? errors.username[0] : '{{ __("main.validation_error") }}');
+                    $('.msg').removeClass('none').text(errors && errors.username ? errors.username[0] : '{{ __("main.validation_error") }}');
                 } else {
                     $('.msg').removeClass('none').text('{{ __("main.server_error") }}');
                 }
             }
         });
+    }
+
+    $('.login-btn').click(function (e) {
+        e.preventDefault();
+        $('input').removeClass('error');
+
+        @if(config('captcha.method') === 'google' && config('recaptcha.site_key'))
+        grecaptcha.ready(function() {
+            grecaptcha.execute('{{ config('recaptcha.site_key') }}', {action: 'login'}).then(function(token) {
+                doLogin(token);
+            });
+        });
+        @elseif(config('captcha.method') === 'cloudflare' && config('turnstile.site_key'))
+        var token = (typeof turnstile !== 'undefined' && loginTurnstileWidgetId !== null) ? turnstile.getResponse(loginTurnstileWidgetId) : '';
+        if (!token) {
+            $('.msg').removeClass('none').text('{{ __("main.captcha_validation_error") }}');
+            return;
+        }
+        doLogin(token);
+        @else
+        doLogin('');
         @endif
     });
 });

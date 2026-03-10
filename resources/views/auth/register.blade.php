@@ -55,6 +55,11 @@
                                             <input type="password" class="form-control form-control-lg" id="password_confirmation" name="password_confirmation" placeholder="{{ __('main.enter_password_again') }}" required>
                                         </div>
                                     </div>
+                                    @if(config('captcha.method') === 'cloudflare' && config('turnstile.site_key'))
+                                    <div class="form-group">
+                                        <div id="register-turnstile"></div>
+                                    </div>
+                                    @endif
                                     <div class="form-group">
                                         <div class="custom-control custom-control-xs custom-checkbox flex-wrap">
                                             <input type="checkbox" class="custom-control-input" id="ok" name="ok" value="1" checked required>
@@ -85,80 +90,34 @@
 @endsection
 
 @push('scripts')
-@if(config('recaptcha.site_key'))
+@if(config('captcha.method') === 'google' && config('recaptcha.site_key'))
 <script src="https://www.google.com/recaptcha/api.js?render={{ config('recaptcha.site_key') }}"></script>
+@endif
+@if(config('captcha.method') === 'cloudflare' && config('turnstile.site_key'))
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 @endif
 <script>
 $(document).ready(function() {
-    $('.register-btn').click(function (e) {
-        e.preventDefault();
-        $('input').removeClass('error');
-        
-        @if(config('recaptcha.site_key'))
-        // Get reCAPTCHA token
-        grecaptcha.ready(function() {
-            grecaptcha.execute('{{ config('recaptcha.site_key') }}', {action: 'register'}).then(function(token) {
-                let username = $('input[name="username"]').val();
-                let password = $('input[name="password"]').val();
-                let email = $('input[name="email"]').val();
-                let password_confirm = $('input[name="password_confirmation"]').val();
-                let formData = new FormData();
-                formData.append('username', username);
-                formData.append('password', password);
-                formData.append('password_confirmation', password_confirm);
-                formData.append('email', email);
-                formData.append('recaptcha_token', token);
-                formData.append('_token', '{{ csrf_token() }}');
-                $.ajax({
-                    url: '{{ route("register") }}',
-                    type: 'POST',
-                    dataType: 'json',
-                    processData: false,
-                    contentType: false,
-                    cache: false,
-                    data: formData,
-                    success: function(data) {
-                        if (data.status) {
-                            document.location.href = data.redirect || '{{ route("cabinet") }}';
-                        } else {
-                            if (data.type === 1) {
-                                data.fields.forEach(function (field) {
-                                    $('input[name="' + field + '"]').addClass('error');
-                                });
-                            }
-                            $('.msg').removeClass('none').text(data.message);
-                        }
-                    },
-                    error: function(xhr) {
-                        if (xhr.status === 422) {
-                            let errors = xhr.responseJSON.errors;
-                            Object.keys(errors).forEach(function(field) {
-                                $('input[name="' + field + '"]').addClass('error');
-                            });
-                            $('.msg').removeClass('none').text(Object.values(errors)[0][0]);
-                        } else {
-                            let errorMessage = '{{ __("main.server_error") }}';
-                            if (xhr.responseJSON && xhr.responseJSON.message) {
-                                errorMessage = xhr.responseJSON.message;
-                            }
-                            $('.msg').removeClass('none').text(errorMessage);
-                        }
-                    }
-                });
-            });
+    var registerTurnstileWidgetId = null;
+    @if(config('captcha.method') === 'cloudflare' && config('turnstile.site_key'))
+    if (typeof turnstile !== 'undefined') {
+        registerTurnstileWidgetId = turnstile.render('#register-turnstile', { sitekey: '{{ config('turnstile.site_key') }}' });
+    } else {
+        window.addEventListener('load', function() {
+            if (document.getElementById('register-turnstile') && typeof turnstile !== 'undefined') {
+                registerTurnstileWidgetId = turnstile.render('#register-turnstile', { sitekey: '{{ config('turnstile.site_key') }}' });
+            }
         });
-        @else
-        // reCAPTCHA not configured, submit form without token
-        let username = $('input[name="username"]').val();
-        let password = $('input[name="password"]').val();
-        let email = $('input[name="email"]').val();
-        let password_confirm = $('input[name="password_confirmation"]').val();
-        let formData = new FormData();
-        formData.append('username', username);
-        formData.append('password', password);
-        formData.append('password_confirmation', password_confirm);
-        formData.append('email', email);
-        formData.append('recaptcha_token', '');
+    }
+    @endif
+
+    function doRegister(captchaToken) {
+        var formData = new FormData();
+        formData.append('username', $('input[name="username"]').val());
+        formData.append('password', $('input[name="password"]').val());
+        formData.append('password_confirmation', $('input[name="password_confirmation"]').val());
+        formData.append('email', $('input[name="email"]').val());
+        formData.append('recaptcha_token', captchaToken || '');
         formData.append('_token', '{{ csrf_token() }}');
         $.ajax({
             url: '{{ route("register") }}',
@@ -172,7 +131,7 @@ $(document).ready(function() {
                 if (data.status) {
                     document.location.href = data.redirect || '{{ route("cabinet") }}';
                 } else {
-                    if (data.type === 1) {
+                    if (data.type === 1 && data.fields) {
                         data.fields.forEach(function (field) {
                             $('input[name="' + field + '"]').addClass('error');
                         });
@@ -182,13 +141,15 @@ $(document).ready(function() {
             },
             error: function(xhr) {
                 if (xhr.status === 422) {
-                    let errors = xhr.responseJSON.errors;
-                    Object.keys(errors).forEach(function(field) {
-                        $('input[name="' + field + '"]').addClass('error');
-                    });
-                    $('.msg').removeClass('none').text(Object.values(errors)[0][0]);
+                    var errors = xhr.responseJSON.errors;
+                    if (errors) {
+                        Object.keys(errors).forEach(function(field) {
+                            $('input[name="' + field + '"]').addClass('error');
+                        });
+                        $('.msg').removeClass('none').text(Object.values(errors)[0][0]);
+                    }
                 } else {
-                    let errorMessage = '{{ __("main.server_error") }}';
+                    var errorMessage = '{{ __("main.server_error") }}';
                     if (xhr.responseJSON && xhr.responseJSON.message) {
                         errorMessage = xhr.responseJSON.message;
                     }
@@ -196,6 +157,27 @@ $(document).ready(function() {
                 }
             }
         });
+    }
+
+    $('.register-btn').click(function (e) {
+        e.preventDefault();
+        $('input').removeClass('error');
+
+        @if(config('captcha.method') === 'google' && config('recaptcha.site_key'))
+        grecaptcha.ready(function() {
+            grecaptcha.execute('{{ config('recaptcha.site_key') }}', {action: 'register'}).then(function(token) {
+                doRegister(token);
+            });
+        });
+        @elseif(config('captcha.method') === 'cloudflare' && config('turnstile.site_key'))
+        var token = (typeof turnstile !== 'undefined' && registerTurnstileWidgetId !== null) ? turnstile.getResponse(registerTurnstileWidgetId) : '';
+        if (!token) {
+            $('.msg').removeClass('none').text('{{ __("main.captcha_validation_error") }}');
+            return;
+        }
+        doRegister(token);
+        @else
+        doRegister('');
         @endif
     });
 });

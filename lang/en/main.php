@@ -105,6 +105,7 @@ return [
     'login_error' => 'Login Error',
     'validation_error' => 'Validation Error',
     'server_error' => 'Server Error',
+    'captcha_validation_error' => 'Captcha verification failed. Please refresh the page and try again.',
 
     'news' => 'News',
     'back_to_home' => 'Back to Home',

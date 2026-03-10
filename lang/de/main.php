@@ -105,6 +105,7 @@ return [
     'login_error' => 'Anmeldefehler',
     'validation_error' => 'Validierungsfehler',
     'server_error' => 'Serverfehler',
+    'captcha_validation_error' => 'Captcha-Überprüfung fehlgeschlagen. Bitte laden Sie die Seite neu und versuchen Sie es erneut.',
 
     'news' => 'Nachrichten',
     'back_to_home' => 'Zurück zur Startseite',

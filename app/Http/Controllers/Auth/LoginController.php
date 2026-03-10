@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Services\SRP6Service;
-use App\Services\RecaptchaService;
+use App\Services\CaptchaService;
 use App\Models\User;
 use App\Models\SiteSetting;
 use Illuminate\Http\Request;
@@ -14,12 +14,12 @@ use Illuminate\Validation\ValidationException;
 class LoginController extends Controller
 {
     protected $srp6Service;
-    protected $recaptchaService;
+    protected $captchaService;
 
-    public function __construct(SRP6Service $srp6Service, RecaptchaService $recaptchaService)
+    public function __construct(SRP6Service $srp6Service, CaptchaService $captchaService)
     {
         $this->srp6Service = $srp6Service;
-        $this->recaptchaService = $recaptchaService;
+        $this->captchaService = $captchaService;
     }
 
     public function showLoginForm()
@@ -37,18 +37,18 @@ class LoginController extends Controller
 
         $messages = [];
 
-        // Add reCAPTCHA validation only if configured
-        if (config('recaptcha.secret_key')) {
+        // Add captcha validation only if enabled (google or cloudflare)
+        if ($this->captchaService->isEnabled()) {
             $rules['recaptcha_token'] = 'required|string';
-            $messages['recaptcha_token.required'] = 'Ошибка проверки reCAPTCHA. Пожалуйста, обновите страницу и попробуйте снова.';
+            $messages['recaptcha_token.required'] = __('main.captcha_validation_error');
         }
 
         $request->validate($rules, $messages);
 
-        // Verify reCAPTCHA token if configured
-        if (config('recaptcha.secret_key') && !$this->recaptchaService->verify($request->recaptcha_token ?? '', $request->ip())) {
+        // Verify captcha token if enabled
+        if ($this->captchaService->isEnabled() && !$this->captchaService->verify($request->recaptcha_token ?? '', $request->ip())) {
             throw ValidationException::withMessages([
-                'username' => ['Ошибка проверки reCAPTCHA. Пожалуйста, обновите страницу и попробуйте снова.'],
+                'username' => [__('main.captcha_validation_error')],
             ]);
         }
 

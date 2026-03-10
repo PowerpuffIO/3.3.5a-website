@@ -105,6 +105,7 @@ return [
     'login_error' => 'Error de inicio de sesión',
     'validation_error' => 'Error de validación',
     'server_error' => 'Error del servidor',
+    'captcha_validation_error' => 'Error de verificación del captcha. Actualice la página e intente de nuevo.',
 
     'news' => 'Noticias',
     'back_to_home' => 'Volver al Inicio',
