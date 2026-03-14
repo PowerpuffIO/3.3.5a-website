@@ -228,3 +228,19 @@ tr:first-child>td>.fc-day-grid-event {
 .hiddenblock {
   display: none;
 }
+
+/* Admin footer "Developed by" link */
+.footer-developed {
+  color: inherit;
+  opacity: 0.85;
+}
+.footer-developed:hover {
+  opacity: 1;
+  color: inherit;
+}
+body[data-layout-mode=dark] .footer-developed {
+  color: #adb5bd;
+}
+body[data-layout-mode=dark] .footer-developed:hover {
+  color: #ced4da;
+}

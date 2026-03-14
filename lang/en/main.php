@@ -5,6 +5,7 @@ return [
     'registration' => 'Registration',
     'personal_account' => 'Personal Account',
     'logout' => 'Logout',
+    'dark_mode' => 'Dark mode',
     'back' => 'Back',
     'save' => 'Save',
     'actions' => 'Actions',

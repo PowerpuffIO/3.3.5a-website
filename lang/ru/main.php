@@ -5,6 +5,7 @@ return [
     'registration' => 'Регистрация',
     'personal_account' => 'Личный кабинет',
     'logout' => 'Выйти',
+    'dark_mode' => 'Тёмная тема',
     'back' => 'Назад',
     'save' => 'Сохранить',
     'actions' => 'Действия',

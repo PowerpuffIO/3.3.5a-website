@@ -5,6 +5,7 @@ return [
     'registration' => 'Registro',
     'personal_account' => 'Cuenta Personal',
     'logout' => 'Cerrar sesión',
+    'dark_mode' => 'Modo oscuro',
     'back' => 'Atrás',
     'save' => 'Guardar',
     'actions' => 'Acciones',

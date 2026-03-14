@@ -13,6 +13,17 @@
     <link href="{{ asset('ppadmin-static/assets/css/custom.css') }}" rel="stylesheet" type="text/css" />
     <script src="https://kit.fontawesome.com/803ae4140f.js" crossorigin="anonymous"></script>
     @stack('styles')
+    <script>
+        (function() {
+            var dark = localStorage.getItem('adminDarkMode') === '1';
+            document.documentElement.setAttribute('data-theme-applied', '1');
+            if (dark) {
+                document.body.setAttribute('data-layout-mode', 'dark');
+                document.body.setAttribute('data-topbar', 'dark');
+                document.body.setAttribute('data-sidebar', 'dark');
+            }
+        })();
+    </script>
 </head>
 <body>
 <div id="layout-wrapper">
@@ -34,7 +45,11 @@
                     </a>
                 </div>
             </div>
-            <div class="d-flex">
+            <div class="d-flex align-items-center">
+                <button type="button" class="btn header-item waves-effect" id="admin-theme-toggle" title="{{ __('main.dark_mode') }}" aria-label="{{ __('main.dark_mode') }}">
+                    <i class="fas fa-moon layout-mode-dark"></i>
+                    <i class="fas fa-sun layout-mode-light"></i>
+                </button>
                 <div class="dropdown d-inline-block">
                     <button type="button" class="btn header-item waves-effect" id="page-header-user-dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         <span class="d-none d-xl-inline-block ms-1">{{ auth()->user()->username }}</span>
@@ -177,9 +192,15 @@
 
         <footer class="footer">
             <div class="container-fluid">
-                <div class="row">
+                <div class="row align-items-center">
                     <div class="col-sm-6">
                         <script>document.write(new Date().getFullYear())</script> © Powerpuff website
+                    </div>
+                    <div class="col-sm-6 text-end">
+                        <a href="https://powerpuff.pro/" target="_blank" rel="noopener noreferrer" class="text-decoration-none d-inline-flex align-items-center gap-1 footer-developed">
+                            <span class="text-muted">Developed by</span>
+                            <img src="https://wow1.powerpuff.pro/powerpuffsite/fonts/powerpuff.png" alt="Powerpuff - website creation" height="20" class="d-inline-block">
+                        </a>
                     </div>
                 </div>
             </div>
@@ -195,6 +216,26 @@
 <script src="{{ asset('ppadmin-static/assets/libs/feather-icons/feather.min.js') }}"></script>
 <script src="{{ asset('ppadmin-static/assets/libs/pace-js/pace.min.js') }}"></script>
 <script src="{{ asset('ppadmin-static/assets/js/app.js') }}"></script>
+<script>
+(function() {
+    var toggle = document.getElementById('admin-theme-toggle');
+    if (toggle) {
+        toggle.addEventListener('click', function() {
+            var dark = document.body.getAttribute('data-layout-mode') !== 'dark';
+            localStorage.setItem('adminDarkMode', dark ? '1' : '0');
+            if (dark) {
+                document.body.setAttribute('data-layout-mode', 'dark');
+                document.body.setAttribute('data-topbar', 'dark');
+                document.body.setAttribute('data-sidebar', 'dark');
+            } else {
+                document.body.setAttribute('data-layout-mode', 'light');
+                document.body.setAttribute('data-topbar', 'light');
+                document.body.setAttribute('data-sidebar', 'light');
+            }
+        });
+    }
+})();
+</script>
 @stack('scripts')
 </body>
 </html>
