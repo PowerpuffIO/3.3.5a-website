@@ -11,134 +11,159 @@ class LadderController extends Controller
 {
     public function index(Request $request)
     {
-        $type = (int)$request->get('type', 5);
-        if (!in_array($type, [2, 3, 5])) {
-            $type = 5;
+        $list = $request->get('list');
+        $type = (int) $request->get('type', 5);
+
+        if ($list === 'honorable_kills' || $list === 'time_played') {
+            $mode = $list;
+        } else {
+            $mode = 'arena';
+            if (!in_array($type, [2, 3, 5], true)) {
+                $type = 5;
+            }
         }
+
         $activeLangs = LanguageSetting::where('is_active', true)->orderBy('sort_order')->get();
         $settings = SiteSetting::first();
 
-        $ladderData = $this->getLadderData($type);
+        $ladderData = [];
+        try {
+            if ($mode === 'arena') {
+                $ladderData = $this->getArenaLadder($type);
+            } elseif ($mode === 'honorable_kills') {
+                $ladderData = $this->getHonorableKillsLadder();
+            } elseif ($mode === 'time_played') {
+                $ladderData = $this->getTimePlayedLadder();
+            }
+        } catch (\Throwable $e) {
+            $ladderData = [];
+        }
 
-        return view('ladder.index', compact('ladderData', 'type', 'activeLangs', 'settings'));
+        return view('ladder.index', compact('ladderData', 'type', 'mode', 'activeLangs', 'settings'));
     }
 
-    private function getLadderData($type = 5)
+    /** Арена: ранг, название команды, участники, рейтинг, общая стат. (П-П), стат. недели (П-П), % побед */
+    private function getArenaLadder(int $type): array
     {
-        try {
-            $results = DB::connection('game_char')->select("
-                SELECT 
-                    arena_team.*, 
-                    characters.class, 
-                    characters.race, 
-                    characters.gender,
-                    characters.name as character_name
-                FROM arena_team 
-                INNER JOIN characters ON (characters.guid = arena_team.captainGuid) 
-                WHERE arena_team.type = ? 
-                ORDER BY arena_team.rating DESC 
-                LIMIT 50
-            ", [$type]);
+        $hasWeek = $this->hasColumn('arena_team', 'weekGames');
+        $wWeek = $hasWeek ? 'COALESCE(at.weekWins, 0)' : '0';
+        $gWeek = $hasWeek ? 'COALESCE(at.weekGames, 0)' : '0';
 
-            $ladderData = [];
-            $id = 1;
+        $sql = "
+            SELECT at.arenaTeamId, at.name AS team_name, at.rating,
+                   at.seasonWins AS seasonWins, at.seasonGames AS seasonGames,
+                   {$wWeek} AS weekWins, {$gWeek} AS weekGames,
+                   GROUP_CONCAT(c.name ORDER BY atm.guid SEPARATOR ' / ') AS members
+            FROM arena_team at
+            LEFT JOIN arena_team_member atm ON atm.arenaTeamId = at.arenaTeamId
+            LEFT JOIN characters c ON c.guid = atm.guid
+            WHERE at.type = ?
+            GROUP BY at.arenaTeamId
+            ORDER BY at.rating DESC
+            LIMIT 100
+        ";
+        $rows = DB::connection('game_char')->select($sql, [$type]);
 
-            foreach ($results as $row) {
-                $games = $row->seasonGames ?? 0;
-                $wins = $row->seasonWins ?? 0;
-                $losses = $games - $wins;
+        $result = [];
+        $place = 1;
+        foreach ($rows as $row) {
+            $seasonWins = (int) ($row->seasonWins ?? 0);
+            $seasonGames = (int) ($row->seasonGames ?? 0);
+            $seasonLosses = $seasonGames - $seasonWins;
+            $weekWins = (int) ($row->weekWins ?? 0);
+            $weekGames = (int) ($row->weekGames ?? 0);
+            $weekLosses = $weekGames - $weekWins;
+            $winPct = $seasonGames > 0 ? round(100 * $seasonWins / $seasonGames, 1) : 0;
 
-                $faction = $this->getFaction($row->race);
-                $race = $this->getRaceImage($row->race, $row->gender);
-                $class = $this->getClassInfo($row->class);
-                $ratingInfo = $this->getRatingInfo($row->rating);
+            $result[] = [
+                'place' => $place++,
+                'team_name' => $row->team_name ?? '',
+                'members' => $row->members ?? '',
+                'rating' => (int) ($row->rating ?? 0),
+                'season_wins' => $seasonWins,
+                'season_losses' => $seasonLosses,
+                'week_wins' => $weekWins,
+                'week_losses' => $weekLosses,
+                'win_percent' => $winPct,
+            ];
+        }
+        return $result;
+    }
 
-                $ladderData[] = [
-                    'id' => $id++,
-                    'name' => $row->name ?? $row->character_name ?? 'Unknown',
-                    'rating' => $row->rating ?? 0,
-                    'seasonWins' => $wins,
-                    'seasonLosses' => $losses,
-                    'seasonGames' => $games,
-                    'class' => $class['name'],
-                    'classImg' => $class['img'],
-                    'faction' => $faction,
-                    'race' => $race,
-                    'ratingInfo' => $ratingInfo,
-                ];
-            }
-
-            return $ladderData;
-        } catch (\Exception $e) {
+    private function getHonorableKillsLadder(): array
+    {
+        $col = $this->honorKillsColumn();
+        if (!$col) {
             return [];
         }
-    }
-
-    private function getFaction($race)
-    {
-        $allianceRaces = [1, 3, 4, 7, 11, 12, 14, 15, 18];
-        
-        if (in_array($race, $allianceRaces)) {
-            return 'Альянс';
+        $sql = "SELECT name, {$col} AS cnt FROM characters WHERE {$col} > 0 ORDER BY {$col} DESC LIMIT 100";
+        $rows = DB::connection('game_char')->select($sql);
+        $result = [];
+        $place = 1;
+        foreach ($rows as $row) {
+            $result[] = [
+                'place' => $place++,
+                'name' => $row->name ?? '',
+                'count' => (int) ($row->cnt ?? 0),
+            ];
         }
-        
-        return 'Орда';
+        return $result;
     }
 
-    private function getRaceImage($race, $gender)
+    private function getTimePlayedLadder(): array
     {
-        $genderSuffix = $gender == 0 ? 'male' : 'female';
-        
-        $raceMap = [
-            1 => "human_{$genderSuffix}",
-            2 => "orc_{$genderSuffix}",
-            3 => "dwarf_{$genderSuffix}",
-            4 => "nightelf_{$genderSuffix}",
-            5 => "undead_{$genderSuffix}",
-            6 => "tauren_{$genderSuffix}",
-            7 => "gnome_{$genderSuffix}",
-            8 => "troll_{$genderSuffix}",
-            9 => "goblin_{$genderSuffix}",
-            10 => "bloodelf_{$genderSuffix}",
-            11 => "draenei_{$genderSuffix}",
-            12 => "worgen_{$genderSuffix}",
-            14 => "pandaren_{$genderSuffix}",
-            15 => "nightelf_dh_{$genderSuffix}",
-            16 => "bloodelf_dh_{$genderSuffix}",
-            17 => "nightborne_{$genderSuffix}",
-            18 => "voidelf_{$genderSuffix}",
-            20 => "vulpera_{$genderSuffix}",
-        ];
-
-        return $raceMap[$race] ?? "human_{$genderSuffix}";
+        if (!$this->hasColumn('characters', 'totaltime')) {
+            return [];
+        }
+        $sql = "SELECT name, totaltime, leveltime FROM characters WHERE totaltime > 0 ORDER BY totaltime DESC LIMIT 100";
+        $rows = DB::connection('game_char')->select($sql);
+        $result = [];
+        $place = 1;
+        foreach ($rows as $row) {
+            $result[] = [
+                'place' => $place++,
+                'name' => $row->name ?? '',
+                'totaltime' => (int) ($row->totaltime ?? 0),
+                'leveltime' => (int) ($row->leveltime ?? 0),
+            ];
+        }
+        return $result;
     }
 
-    private function getClassInfo($classId)
+    private function hasColumn(string $table, string $column): bool
     {
-        $classes = [
-            1 => ['name' => 'Воин', 'img' => 'WARRIOR'],
-            2 => ['name' => 'Паладин', 'img' => 'PALADIN'],
-            3 => ['name' => 'Охотник', 'img' => 'HUNTER'],
-            4 => ['name' => 'Разбойник', 'img' => 'ROGUE'],
-            5 => ['name' => 'Жрец', 'img' => 'PRIEST'],
-            6 => ['name' => 'Рыцарь смерти', 'img' => 'DEATHKNIGHT'],
-            7 => ['name' => 'Шаман', 'img' => 'SHAMAN'],
-            8 => ['name' => 'Маг', 'img' => 'MAGE'],
-            9 => ['name' => 'Чернокнижник', 'img' => 'WARLOCK'],
-            11 => ['name' => 'Друид', 'img' => 'DRUID'],
-        ];
-
-        return $classes[$classId] ?? ['name' => 'Unknown', 'img' => 'WARRIOR'];
+        try {
+            $conn = DB::connection('game_char');
+            $db = $conn->getDatabaseName();
+            $r = $conn->selectOne(
+                "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                [$db, $table, $column]
+            );
+            return isset($r->c) && (int) $r->c > 0;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
-    private function getRatingInfo($rating)
+    private function honorKillsColumn(): ?string
     {
-        if ($rating >= 2370) return 14;
-        if ($rating >= 2070) return 13;
-        if ($rating >= 1770) return 12;
-        if ($rating >= 1570) return 11;
-        if ($rating >= 1370) return 9;
-        
-        return 8;
+        foreach (['totalKills', 'totalHonorPoints'] as $col) {
+            if ($this->hasColumn('characters', $col)) {
+                return $col;
+            }
+        }
+        return null;
+    }
+
+    public static function formatTime(int $seconds): string
+    {
+        $h = (int) floor($seconds / 3600);
+        $m = (int) floor(($seconds % 3600) / 60);
+        if ($h >= 24) {
+            $d = (int) floor($h / 24);
+            $h = $h % 24;
+            return "{$d}d {$h}h {$m}m";
+        }
+        return "{$h}h {$m}m";
     }
 }

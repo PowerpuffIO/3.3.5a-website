@@ -20,15 +20,25 @@
 |---|---|
 | [**Инструкция на русском языке**](Russian.md) | Полная установка и настройка (капча, БД, веб-сервер, админ-панель). |
 | [**Instructions in English**](English.md) | Full installation and configuration (captcha, database, web server, admin panel). |
+| [**Instrucciones en español**](Spanish.md) | Instalación y configuración completas (captcha, base de datos, servidor web, panel de administración). |
 
 ---
 
 ## Кратко / Summary
 
+**RU**
+
 - **Стек:** Laravel 11, PHP 8.2+, MySQL / MariaDB
 - **Капча:** reCAPTCHA v3 или Cloudflare Turnstile (или отключена)
-- **Языки:** ru, en, de, es
+- **Языки:** ru, en, de, es, fr
 - **Функции:** новости, личный кабинет, админ-панель, парсер аккаунтов, логотип, таблица лидеров
+
+**EN**
+
+- **Stack:** Laravel 11, PHP 8.2+, MySQL / MariaDB
+- **Captcha:** reCAPTCHA v3 or Cloudflare Turnstile (or disabled)
+- **Languages:** ru, en, de, es, fr
+- **Features:** news, personal account, admin panel, account parser, logo, leaderboard
 
 ## Поддержка / Support
 
