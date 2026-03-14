@@ -14,6 +14,30 @@
     @if(file_exists(public_path('powerpuffsite/css/ladder/5.60a3b147f091048d9af5.css')))
     <link href="{{ asset('powerpuffsite/css/ladder/5.60a3b147f091048d9af5.css') }}" rel="stylesheet" type="text/css"/>
     @endif
+    <style>
+        .ladder-nav { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+        .ladder-nav a {
+            display: inline-block;
+            padding: 10px 18px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            color: #c9a227;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .ladder-nav a:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.35);
+            color: #f0d878;
+        }
+        .ladder-nav a.active {
+            background: rgba(201, 162, 39, 0.35);
+            border-color: #c9a227;
+            color: #f0d878;
+        }
+    </style>
 </head>
 <body>
 <div class="wrapper">
@@ -89,54 +113,13 @@
                 <p class="margin-none font-bliz-light-small-beige">{{ __('main.ladder_description') }}</p>
             </div>
             <div class="space-rhythm-medium"></div>
-            <div class="contain-medium gutter-small" media-medium="!gutter-small" media-nav="!contain-medium">
-                <div class="List List--vertical List--full" media-nav="!List--full !List--vertical List--gutters">
-                    <div class="List-item">
-                        <div class="SelectMenu SelectMenu--fullscreen" media-medium="!SelectMenu--fullscreen">
-                            <div class="SelectMenu-toggle">{{ __('main.arena_type') }}</div>
-                        </div>
-                        <div class="space-normal" media-nav="!space-normal"></div>
-                    </div>
-                    <div class="List-item">
-                        <div class="SelectMenu SelectMenu--fullscreen" media-medium="!SelectMenu--fullscreen">
-                            <div class="SelectMenu-toggle">
-                                @if(isset($mode) && $mode === 'honorable_kills'){{ __('main.ladder_tab_honorable_kills') }}
-                                @elseif(isset($mode) && $mode === 'time_played'){{ __('main.ladder_tab_time_played') }}
-                                @elseif($type == 2){{ __('main.arena_2v2') }}
-                                @elseif($type == 3){{ __('main.arena_3v3') }}
-                                @else{{ __('main.arena_5v5') }}
-                                @endif
-                            </div>
-                            <div class="SelectMenu-menu">
-                                <div class="SelectMenu-close">
-                                    <span class="Icon Icon--closeGold SelectMenu-close-icon"></span>
-                                </div>
-                                <div class="SelectMenu-inputContainer">
-                                    <input class="SelectMenu-input" type="search" placeholder="{{ __('main.search') }}..."/>
-                                </div>
-                                <div class="SelectMenu-items">
-                                    <div class="SelectMenu-item" data-value="{{ __('main.arena_2v2') }}">
-                                        <a class="Link SelectMenu-link" href="{{ route('ladder', ['type' => 2]) }}">{{ __('main.arena_2v2') }}</a>
-                                    </div>
-                                    <div class="SelectMenu-item" data-value="{{ __('main.arena_3v3') }}">
-                                        <a class="Link SelectMenu-link" href="{{ route('ladder', ['type' => 3]) }}">{{ __('main.arena_3v3') }}</a>
-                                    </div>
-                                    <div class="SelectMenu-item" data-value="{{ __('main.arena_5v5') }}">
-                                        <a class="Link SelectMenu-link" href="{{ route('ladder', ['type' => 5]) }}">{{ __('main.arena_5v5') }}</a>
-                                    </div>
-                                    <div class="SelectMenu-item" data-value="{{ __('main.ladder_tab_honorable_kills') }}">
-                                        <a class="Link SelectMenu-link" href="{{ route('ladder', ['list' => 'honorable_kills']) }}">{{ __('main.ladder_tab_honorable_kills') }}</a>
-                                    </div>
-                                    <div class="SelectMenu-item" data-value="{{ __('main.ladder_tab_time_played') }}">
-                                        <a class="Link SelectMenu-link" href="{{ route('ladder', ['list' => 'time_played']) }}">{{ __('main.ladder_tab_time_played') }}</a>
-                                    </div>
-                                    <div class="SelectMenu-exception">{{ __('main.no_results') }}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <nav class="ladder-nav" aria-label="{{ __('main.ladder_title') }}">
+                <a href="{{ route('ladder', ['type' => 2]) }}" class="{{ isset($mode) && $mode === 'arena' && $type == 2 ? 'active' : '' }}">{{ __('main.arena_2v2') }}</a>
+                <a href="{{ route('ladder', ['type' => 3]) }}" class="{{ isset($mode) && $mode === 'arena' && $type == 3 ? 'active' : '' }}">{{ __('main.arena_3v3') }}</a>
+                <a href="{{ route('ladder', ['type' => 5]) }}" class="{{ isset($mode) && $mode === 'arena' && $type == 5 ? 'active' : '' }}">{{ __('main.arena_5v5') }}</a>
+                <a href="{{ route('ladder', ['list' => 'honorable_kills']) }}" class="{{ isset($mode) && $mode === 'honorable_kills' ? 'active' : '' }}">{{ __('main.ladder_tab_honorable_kills') }}</a>
+                <a href="{{ route('ladder', ['list' => 'time_played']) }}" class="{{ isset($mode) && $mode === 'time_played' ? 'active' : '' }}">{{ __('main.ladder_tab_time_played') }}</a>
+            </nav>
             <div class="space-medium" media-wide="space-huge"></div>
         </div>
     </div>
@@ -273,77 +256,5 @@
 @endif
 <script src="{{ asset('powerpuffsite/js/vendor.min.js') }}"></script>
 <script src="{{ asset('powerpuffsite/js/main_home.min.js') }}"></script>
-<script>
-(function() {
-    // SelectMenu functionality
-    document.addEventListener('DOMContentLoaded', function() {
-        var selectMenus = document.querySelectorAll('.SelectMenu');
-        
-        selectMenus.forEach(function(selectMenu) {
-            var toggle = selectMenu.querySelector('.SelectMenu-toggle');
-            var menu = selectMenu.querySelector('.SelectMenu-menu');
-            var close = selectMenu.querySelector('.SelectMenu-close');
-            var input = selectMenu.querySelector('.SelectMenu-input');
-            var items = selectMenu.querySelectorAll('.SelectMenu-item');
-            var exception = selectMenu.querySelector('.SelectMenu-exception');
-            
-            if (!toggle || !menu) return;
-            
-            // Toggle menu on click
-            toggle.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                selectMenu.classList.toggle('is-open');
-                menu.style.display = selectMenu.classList.contains('is-open') ? 'block' : 'none';
-            });
-            
-            // Close menu
-            if (close) {
-                close.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    selectMenu.classList.remove('is-open');
-                    menu.style.display = 'none';
-                    if (input) input.value = '';
-                    filterItems();
-                });
-            }
-            
-            // Filter items on input
-            function filterItems() {
-                if (!input) return;
-                var filter = input.value.toLowerCase();
-                var found = false;
-                
-                items.forEach(function(item) {
-                    var text = (item.textContent || item.innerText).toLowerCase();
-                    if (text.indexOf(filter) > -1) {
-                        item.style.display = '';
-                        found = true;
-                    } else {
-                        item.style.display = 'none';
-                    }
-                });
-                
-                if (exception) {
-                    exception.style.display = found ? 'none' : 'block';
-                }
-            }
-            
-            if (input) {
-                input.addEventListener('keyup', filterItems);
-            }
-            
-            // Close on outside click
-            document.addEventListener('click', function(e) {
-                if (!selectMenu.contains(e.target)) {
-                    selectMenu.classList.remove('is-open');
-                    menu.style.display = 'none';
-                }
-            });
-        });
-    });
-})();
-</script>
 </body>
 </html>
